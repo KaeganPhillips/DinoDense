@@ -86,18 +86,30 @@ class NuggetShape:
                the outline. Larger values give fewer points.
         return: a NuggetShape
         '''
-        contour_mm = (np.asarray(contour_px) * mm_per_px).astype(np.float32)
+        polygon_px = cls.simplify_contour(contour_px, mm_per_px, tolerance_mm)
 
-        simplified = cv2.approxPolyDP(
-            contour_mm.reshape(-1, 1, 2), tolerance_mm, True
-        ).reshape(-1, 2)
+        return cls.from_pixel_polygon(name, polygon_px, mm_per_px)
 
-        moments = cv2.moments(simplified)
+    #--------------------------------------------------------------------------
+    @classmethod
+    def from_pixel_polygon(cls, name, polygon_px, mm_per_px):
+        '''
+        Method to make a shape from a polygon in scan pixels. The polygon is
+        converted to millimeters and centered on its centroid.
+
+        param: name: the name of the shape, e.g. "trex"
+        param: polygon_px: the polygon as an array of (x, y) points in pixels
+        param: mm_per_px: the millimeters that one pixel of the scan covers
+        return: a NuggetShape
+        '''
+        polygon = (np.asarray(polygon_px) * mm_per_px).astype(np.float32)
+
+        moments = cv2.moments(polygon)
         centroid = np.array([
             moments["m10"] / moments["m00"],
             moments["m01"] / moments["m00"],
         ])
-        centered = np.round(simplified - centroid, COORDINATE_DECIMALS)
+        centered = np.round(polygon - centroid, COORDINATE_DECIMALS)
 
         polygon_mm = [(float(x), float(y)) for x, y in centered]
 
@@ -106,6 +118,26 @@ class NuggetShape:
             polygon_mm.reverse()
 
         return cls(name=name, polygon_mm=polygon_mm)
+
+    #--------------------------------------------------------------------------
+    @staticmethod
+    def simplify_contour(contour_px, mm_per_px, tolerance_mm):
+        '''
+        Method to simplify an outline found in a scan to a polygon with far
+        fewer points, using the Douglas-Peucker algorithm. The polygon stays in
+        scan pixels, so it can be drawn on the scan.
+
+        param: contour_px: the outline as an array of (x, y) points in pixels
+        param: mm_per_px: the millimeters that one pixel of the scan covers
+        param: tolerance_mm: how far in millimeters the polygon may stray from
+               the outline. Larger values give fewer points.
+        return: the polygon as an array of (x, y) points in pixels
+        '''
+        contour = np.asarray(contour_px, dtype=np.float32)
+
+        return cv2.approxPolyDP(
+            contour.reshape(-1, 1, 2), tolerance_mm / mm_per_px, True
+        ).reshape(-1, 2)
 
     #--------------------------------------------------------------------------
     @staticmethod

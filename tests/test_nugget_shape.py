@@ -181,3 +181,40 @@ def test_points_run_the_same_way_whichever_way_the_outline_did():
     assert NuggetShape._signed_area(forward.polygon_mm, signed=True) > 0
     assert NuggetShape._signed_area(backward.polygon_mm, signed=True) > 0
 
+#------------------------------------------------------------------------------
+def test_simplified_contour_stays_in_pixels():
+    contour = make_rectangle_contour(500, 800, 300, 200)
+
+    polygon_px = NuggetShape.simplify_contour(
+        contour, MM_PER_PX, TOLERANCE_MM
+    )
+
+    assert len(polygon_px) == 4
+    assert polygon_px[:, 0].min() == 500
+    assert polygon_px[:, 0].max() == 800
+    assert polygon_px[:, 1].min() == 800
+    assert polygon_px[:, 1].max() == 1000
+
+#------------------------------------------------------------------------------
+def test_pixel_polygon_is_converted_and_centered():
+    polygon_px = [(500, 800), (800, 800), (800, 1000), (500, 1000)]
+
+    shape = NuggetShape.from_pixel_polygon("box", polygon_px, MM_PER_PX)
+
+    assert sorted(shape.polygon_mm) == [
+        (-15, -10), (-15, 10), (15, -10), (15, 10)
+    ]
+
+#------------------------------------------------------------------------------
+def test_contour_gives_the_same_shape_as_simplifying_then_converting():
+    contour = make_circle_contour(2000, 3000, 400)
+
+    polygon_px = NuggetShape.simplify_contour(
+        contour, MM_PER_PX, TOLERANCE_MM
+    )
+
+    assert NuggetShape.from_pixel_polygon("circle", polygon_px, MM_PER_PX) \
+        == NuggetShape.from_pixel_contour(
+            "circle", contour, MM_PER_PX, TOLERANCE_MM
+        )
+

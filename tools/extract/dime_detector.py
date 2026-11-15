@@ -14,6 +14,9 @@ import cv2
 import numpy as np
 
 #------------------------------------------------------------------------------
+# the diameter of a U.S. dime in millimeters, the size reference in every scan
+DIME_DIAMETER_MM = 17.91
+
 # the coarse search runs on a copy of the scan shrunk to this width in pixels,
 # so the circle search stays fast on very large scans
 COARSE_IMAGE_WIDTH = 1000
@@ -68,7 +71,10 @@ class DimeNotFoundError(Exception):
 #------------------------------------------------------------------------------
 @dataclass
 class DimeDetection:
-    '''The position and size of the dime found in a scan, in pixels.'''
+    '''
+    The position and size of the dime found in a scan, in pixels, and so the
+    scale of the scan.
+    '''
     center_x_px: float
     center_y_px: float
     radius_px: float
@@ -78,6 +84,12 @@ class DimeDetection:
     def diameter_px(self):
         '''The diameter of the dime in pixels.'''
         return 2 * self.radius_px
+
+    #--------------------------------------------------------------------------
+    @property
+    def mm_per_px(self):
+        '''The millimeters that one pixel of the scan covers.'''
+        return DIME_DIAMETER_MM / self.diameter_px
 
 #------------------------------------------------------------------------------
 class DimeDetector:

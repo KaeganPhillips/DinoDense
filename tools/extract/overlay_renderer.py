@@ -142,7 +142,9 @@ class OverlayRenderer:
             if cv2.waitKey(50) != -1:
                 break
 
-        cv2.destroyWindow(title)
+        # a window closed by hand is already gone, and destroying a window
+        # that is gone is an error, so close whatever is left instead
+        cv2.destroyAllWindows()
 
     #--------------------------------------------------------------------------
     @staticmethod

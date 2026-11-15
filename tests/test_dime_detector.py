@@ -10,7 +10,12 @@
 
 import pytest
 
-from dime_detector import DimeDetection, DimeDetector, DimeNotFoundError
+from dime_detector import (
+    DIME_DIAMETER_MM,
+    DimeDetection,
+    DimeDetector,
+    DimeNotFoundError,
+)
 from mock_scans import draw_mock_scan, make_blank_scan
 
 # how close the detected dime must be to the drawn dime, in pixels
@@ -22,6 +27,23 @@ def test_diameter_is_twice_the_radius():
     detection = DimeDetection(center_x_px=10, center_y_px=20, radius_px=7.5)
 
     assert detection.diameter_px == 15
+
+#------------------------------------------------------------------------------
+def test_scale_is_the_dime_diameter_over_its_pixel_diameter():
+    detection = DimeDetection(center_x_px=10, center_y_px=20, radius_px=150)
+
+    assert detection.mm_per_px == pytest.approx(DIME_DIAMETER_MM / 300)
+
+#------------------------------------------------------------------------------
+def test_scale_of_a_detected_dime():
+    scan = draw_mock_scan(1000, 1200, 400, 300, 50, with_nugget=False)
+
+    detection = DimeDetector().detect(scan)
+
+    # a dime drawn 100 pixels across, so one pixel is about a hundredth of it
+    assert detection.mm_per_px == pytest.approx(
+        DIME_DIAMETER_MM / 100, rel=0.03
+    )
 
 #------------------------------------------------------------------------------
 def test_detects_dime_in_scan_without_nugget():

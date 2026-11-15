@@ -5,7 +5,8 @@
 # test_overlay_renderer.py
 #
 # Tests for the overlay renderer. Scans are drawn as mock images (see
-# mock_scans.py). Showing an overlay opens a window, so it is not tested.
+# mock_scans.py). Showing an overlay opens a window, so the window functions
+# of OpenCV are replaced with a fake window.
 ###############################################################################
 
 import cv2
@@ -20,6 +21,8 @@ from overlay_renderer import (
     POLYGON_COLOR,
     OverlayRenderer,
 )
+
+WINDOW_TITLE = "box"
 
 WIDTH = 4000
 HEIGHT = 5000
@@ -144,4 +147,77 @@ def test_save_raises_when_the_image_cannot_be_written(tmp_path):
 
     with pytest.raises(Exception):
         OverlayRenderer().save(overlay, tmp_path / "box.notanimage")
+
+#------------------------------------------------------------------------------
+class FakeWindow:
+    '''
+    A stand-in for the OpenCV window functions. The window stays visible for
+    the given number of checks, then counts as closed by hand. Any key press
+    in key_presses is returned by waitKey in turn.
+    '''
+
+    def __init__(self, visible_checks, key_presses=()):
+        self.visible_checks = visible_checks
+        self.key_presses = list(key_presses)
+        self.is_destroyed = False
+
+    def get_window_property(self, title, prop):
+        if self.visible_checks == 0:
+            return -1  # closed by hand
+
+        self.visible_checks -= 1
+        return 1
+
+    def wait_key(self, delay):
+        return self.key_presses.pop(0) if self.key_presses else -1
+
+    def destroy_window(self, title):
+        # as OpenCV does when the window is already gone
+        if self.visible_checks == 0:
+            raise cv2.error("NULL window")
+
+        self.is_destroyed = True
+
+    def destroy_all_windows(self):
+        self.is_destroyed = True
+
+#------------------------------------------------------------------------------
+def install_fake_window(monkeypatch, fake_window):
+    '''
+    Method to replace the OpenCV window functions with a fake window.
+
+    param: monkeypatch: the pytest monkeypatch fixture
+    param: fake_window: the FakeWindow to replace the functions with
+    '''
+    monkeypatch.setattr(cv2, "namedWindow", lambda title, flags: None)
+    monkeypatch.setattr(cv2, "resizeWindow", lambda title, w, h: None)
+    monkeypatch.setattr(cv2, "imshow", lambda title, image: None)
+    monkeypatch.setattr(
+        cv2, "getWindowProperty", fake_window.get_window_property
+    )
+    monkeypatch.setattr(cv2, "waitKey", fake_window.wait_key)
+    monkeypatch.setattr(cv2, "destroyWindow", fake_window.destroy_window)
+    monkeypatch.setattr(
+        cv2, "destroyAllWindows", fake_window.destroy_all_windows
+    )
+
+#------------------------------------------------------------------------------
+def test_show_closes_when_a_key_is_pressed(monkeypatch):
+    fake_window = FakeWindow(visible_checks=100, key_presses=[-1, -1, 32])
+    install_fake_window(monkeypatch, fake_window)
+    overlay = np.zeros((50, 60, 3), dtype=np.uint8)
+
+    OverlayRenderer().show(overlay, WINDOW_TITLE)
+
+    assert fake_window.is_destroyed
+
+#------------------------------------------------------------------------------
+def test_show_closes_when_the_window_is_closed_by_hand(monkeypatch):
+    fake_window = FakeWindow(visible_checks=3)
+    install_fake_window(monkeypatch, fake_window)
+    overlay = np.zeros((50, 60, 3), dtype=np.uint8)
+
+    OverlayRenderer().show(overlay, WINDOW_TITLE)
+
+    assert fake_window.is_destroyed
 
